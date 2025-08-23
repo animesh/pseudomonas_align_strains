@@ -1804,8 +1804,7 @@ set grid
 unset key
 set border 10
 set tics scale 0
-set xlabel "CP011857.1"
-set ylabel "QRY"
+# Axis labels are now set above
 set format "%.0f"
 set mouse format "%.0f"
 set mouse mouseformat "[%.0f, %.0f]"
@@ -1814,6 +1813,28 @@ set yrange [1:7550891]
 set style line 1  lt 1 lw 3 pt 6 ps 1
 set style line 2  lt 3 lw 3 pt 6 ps 1
 set style line 3  lt 2 lw 3 pt 6 ps 1
+
+# Clear legend and annotations
+set key at graph 0.02, graph 0.98 left font "Arial,12"
+
+# Add a red arrow pointing to VIM gene location
+set arrow 1 from graph 0.9, first 7074888 to graph 0.95, first 7074888 lc rgb "red" lw 3 head filled
+set label 1 "VIM gene" at graph 0.85, first 7074888 center tc rgb "red" font "Arial,12,bold"
+
+# Add grey dots for unique regions
+# ST235 unique regions (grey dots on right)
+set object 2 circle at graph 0.99, first 7072697 size graph 0.005 fc rgb "#808080" fillstyle solid noborder
+
+# ATCC unique regions (grey dots on bottom)
+set object 3 circle at first 50000, graph 0.005 size graph 0.005 fc rgb "#808080" fillstyle solid noborder
+set object 4 circle at first 650000, graph 0.005 size graph 0.005 fc rgb "#808080" fillstyle solid noborder
+set object 5 circle at first 1250000, graph 0.005 size graph 0.005 fc rgb "#808080" fillstyle solid noborder
+
+# Add title and better axis labels
+set title "Genome Alignment: ATCC 27853 vs ST235\nCyan=Forward alignments, Purple=Reverse alignments, Red=VIM gene, Black=Unique regions" font "Arial,14,bold"
+set xlabel "ATCC 27853 genome position" font "Arial,12"
+set ylabel "ST235 genome position" font "Arial,12"
+
 plot \
  "ATCC_vs_ST_plot.fplot" title "FWD" w lp ls 1, \
  "ATCC_vs_ST_plot.rplot" title "REV" w lp ls 2
