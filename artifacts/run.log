@@ -1,0 +1,57 @@
+[2025-08-23T15:08:56Z] minimap2 found — optional sensitive mapping available
+[2025-08-23T15:08:56Z] Step 0: FASTA preparation
+[2025-08-23T15:08:56Z] ATCC.fixed.fasta exists — skipping FASTA cleaning for ATCC
+[2025-08-23T15:08:56Z] ST.fixed.fasta exists — skipping FASTA cleaning for ST
+[2025-08-23T15:08:56Z] Step 1: pairwise alignment (nucmer)
+[2025-08-23T15:08:56Z] pa_comparison.delta already exists — skipping nucmer
+[2025-08-23T15:08:56Z] Step 2: delta-filter and show-coords (strict + relaxed)
+[2025-08-23T15:08:56Z] pa_comparison.filtered.delta exists — skipping strict filter
+[2025-08-23T15:08:56Z] pa_comparison.coords exists — skipping show-coords (strict)
+[2025-08-23T15:08:56Z] pa_comparison.relaxed.filtered.delta exists — skipping
+[2025-08-23T15:08:56Z] pa_comparison.relaxed.coords exists — skipping
+[2025-08-23T15:08:56Z] Step 3: mummerplot and render PNGs
+[2025-08-23T15:08:56Z] Generating mummerplot files (relaxed)
+gnuplot 5.4 patchlevel 2
+Writing filtered delta file pa_comparison.filter
+Reading delta file pa_comparison.relaxed.filtered.delta
+Writing plot files pa_comparison.fplot, pa_comparison.rplot
+Writing gnuplot script pa_comparison.gp
+Forking mouse listener
+Rendering plot to screen
+
+set mouse clipboardformat "[%.0f, %.0f]"
+          ^
+"pa_comparison.gp" line 1863: wrong option
+
+WARNING: Unable to run 'gnuplot -geometry 500x500+0+0 -title mummerplot pa_comparison.gp', Inappropriate ioctl for device
+-- INTERACTIVE MODE --
+consult gnuplot docs for command list
+mouse 1: coords to clipboard
+mouse 2: mark on plot
+mouse 3: zoom box
+'h' for help in plot window
+enter to exit
+[2025-08-23T15:09:15Z] Rendered pa_comparison.relaxed.png
+[2025-08-23T15:09:15Z] Step 4: align blaVIM2 to ST and ATCC
+[2025-08-23T15:09:15Z] bla_ST.coords exists — skipping
+[2025-08-23T15:09:15Z] bla_ATCC.coords exists — skipping
+[2025-08-23T15:09:15Z] Step 5: create rectangle overlays with scripts/make_rects.py
+Fallback: creating full-AT rectangle for bla match 1 on JAFFXY010000040.1 3843-4485 mapped to ST global 458264-458906
+Fallback: creating full-AT rectangle for bla match 2 on JAFFXY010000040.1 4477-5332 mapped to ST global 458898-459753
+Fallback: creating full-AT rectangle for bla match 3 on JAFFXY010001665.1 1-282 mapped to ST global 342093-342374
+Fallback: creating full-AT rectangle for bla match 4 on JAFFXY010001793.1 124-223 mapped to ST global 566688-566787
+Wrote /home/ash022/pseudomonas_align_strains/pa_comparison.rects.gp with 4 rectangle(s). Output PNG will be /home/ash022/pseudomonas_align_strains/pa_comparison.rects.png
+[2025-08-23T15:09:15Z] Ran make_rects.py on pa_comparison.relaxed.coords
+[2025-08-23T15:09:15Z] Step 6: Optional minimap2 mapping of subset ST contigs (if subset exists)
+[M::mm_idx_gen::0.178*0.98] collected minimizers
+[M::mm_idx_gen::0.208*1.11] sorted minimizers
+[M::main::0.208*1.11] loaded/built the index for 1 target sequence(s)
+[M::mm_mapopt_update::0.218*1.10] mid_occ = 50
+[M::mm_idx_stat] kmer size: 19; skip: 19; is_hpc: 0; #seq: 1
+[M::mm_idx_stat::0.225*1.10] distinct minimizers: 671836 (98.67% are singletons); average occurrences: 1.017; average spacing: 9.998; total length: 6833187
+[M::worker_pipeline::0.227*1.10] mapped 3 sequences
+[M::main] Version: 2.24-r1122
+[M::main] CMD: minimap2 -x asm5 -t2 ATCC.fixed.fasta subset_st_contigs.fasta
+[M::main] Real time: 0.235 sec; CPU: 0.258 sec; Peak RSS: 0.039 GB
+[2025-08-23T15:09:15Z] minimap2 produced minimap_st_vs_atcc.paf (may be empty)
+[2025-08-23T15:09:15Z] Step 7: collect artifacts into artifacts/

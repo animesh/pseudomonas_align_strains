@@ -1,78 +1,101 @@
 
 Step 1: Download Genome Sequences
-bash
-# Create working directory
-mkdir pa_comparison && cd pa_comparison
+```bash
+# Create working directory and move into it
+mkdir -p pa_comparison && cd pa_comparison
 
-# Download ATCC 27853 genome
-wget -O atcc27853.fasta "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?tool=portal&save=file&log$=seqview&db=nuccore&report=fasta&id=CP009001.1"
+# Download ATCC 27853 genome (saved as ATCC.fixed.fasta)
+wget -O ATCC.fixed.fasta "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?tool=portal&save=file&log$=seqview&db=nuccore&report=fasta&id=CP009001.1"
 
-# For ST235 strain, you'll need to choose one. Popular options:
-# ST235 strain VRFPA04 (complete genome)
-wget -O st235.fasta "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?tool=portal&save=file&log$=seqview&db=nuccore&report=fasta&id=CP003149.1"
+# Download a representative ST235 genome (saved as ST.fixed.fasta)
+wget -O ST.fixed.fasta "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?tool=portal&save=file&log$=seqview&db=nuccore&report=fasta&id=CP003149.1"
+```
+
 Step 2: Install Required Tools
-bash
-# Using conda (recommended)
-conda create -n genome_comparison
+```bash
+# Recommended: use conda to create an isolated environment
+conda create -n genome_comparison -y python=3.10
 conda activate genome_comparison
 
-# Install tools
-conda install -c bioconda mummer samtools prokka roary blast
-conda install -c conda-forge matplotlib seaborn
+# Install common bioinformatics tools from bioconda
+conda install -c bioconda mummer samtools prokka roary blast -y
+conda install -c conda-forge matplotlib seaborn -y
 
-# Or using apt/yum for Ubuntu/CentOS
-sudo apt install mummer samtools
+# Alternative (system package manager) on Debian/Ubuntu
+sudo apt update
+sudo apt install -y mummer samtools gnuplot
+```
+
 Step 3: Genome Alignment with NUCmer
-bash
-# Create NUCmer alignment
-nucmer --prefix=pa_comparison atcc27853.fasta st235.fasta
+```bash
+# Run nucmer (ATCC is reference, ST is query)
+nucmer --prefix=pa_comparison ATCC.fixed.fasta ST.fixed.fasta
+
+# Optional: filter delta to 1-to-1 best matches
+# Optional: filter delta to 1-to-1 best matches
+delta-filter -1 pa_comparison.delta > pa_comparison.filtered.delta || true
 
 # Generate alignment coordinates
-show-coords -rcl pa_comparison.delta > pa_comparison.coords
+show-coords -rcl pa_comparison.filtered.delta > pa_comparison.coords
 
-# Generate SNP/indel summary
-show-snps -Clr pa_comparison.delta > pa_comparison.snps
+# SNP/indel summary
+show-snps -Clr pa_comparison.filtered.delta > pa_comparison.snps
 
-# Generate alignment statistics
-dnadiff -p pa_comparison atcc27853.fasta st235.fasta
+# Whole-genome summary using dnadiff
+dnadiff -p pa_comparison ATCC.fixed.fasta ST.fixed.fasta
+```
+
 Step 4: Visualization
-bash
-# Generate dot plot
-mummerplot --fat --layout --filter -p pa_comparison pa_comparison.delta
+```bash
+# Create a dot-plot (uses gnuplot)
+# Prefer the filtered delta file when available; fall back to the unfiltered delta.
+if [ -s pa_comparison.filtered.delta ]; then
+    mummerplot --fat --layout --filter -p pa_comparison pa_comparison.filtered.delta || mummerplot --fat --layout -p pa_comparison pa_comparison.filtered.delta
+elif [ -s pa_comparison.delta ]; then
+    mummerplot --fat --layout -p pa_comparison pa_comparison.delta || true
+else
+    echo "No delta file found: pa_comparison.filtered.delta or pa_comparison.delta" >&2
+fi
 
-# Convert to PNG (requires gnuplot)
-sudo apt install gnuplot
-gnuplot pa_comparison.gp
+# If gnuplot throws errors, ensure gnuplot is installed and regenerate
+gnuplot pa_comparison.gp || true
+```
+
 Step 5: Detailed Analysis
-bash
-# Extract unaligned regions (potential insertions/deletions)
-show-diff pa_comparison.delta > pa_comparison.diff
+```bash
+# Extract regions that differ/unmapped (useful for insertions/deletions)
+show-diff pa_comparison.filtered.delta > pa_comparison.diff
 
-# Get alignment coverage statistics
-show-tiling pa_comparison.delta > pa_comparison.tiling
+# Tiling/coverage information
+show-tiling pa_comparison.filtered.delta > pa_comparison.tiling
+```
+
 Step 6: Gene-Level Comparison (Optional)
-bash
-# Annotate both genomes
-sudo apt install prokka
-prokka --outdir atcc27853_annotation --prefix atcc27853 atcc27853.fasta
-prokka --outdir st235_annotation --prefix st235 st235.fasta
+```bash
+# Annotate both genomes with Prokka (produces .ffn files for coding sequences)
+prokka --outdir ATCC_annotation --prefix ATCC ATCC.fixed.fasta
+prokka --outdir ST_annotation --prefix ST ST.fixed.fasta
 
-# Compare gene content using BLAST
-makeblastdb -in atcc27853_annotation/atcc27853.ffn -dbtype nucl -out atcc27853_genes
-blastn -query st235_annotation/st235.ffn -db atcc27853_genes -outfmt 6 -out gene_comparison.blast
+# Create a BLAST database from ATCC genes and search with ST genes
+makeblastdb -in ATCC_annotation/ATCC.ffn -dbtype nucl -out ATCC_genes
+blastn -query ST_annotation/ST.ffn -db ATCC_genes -outfmt 6 -out gene_comparison.blast
+```
+
 Interpreting Key Output Files
-pa_comparison.report - Overall alignment statistics
-pa_comparison.snps - SNPs and small indels
-pa_comparison.coords - Alignment coordinates
-pa_comparison.[png/ps] - Dot plot visualization
-Quick Analysis Script
-Here's a Python script to summarize key differences:
 
-python
+- `pa_comparison.report` - Overall alignment statistics produced by `dnadiff`
+- `pa_comparison.snps` - SNPs and small indels (from `show-snps`)
+- `pa_comparison.coords` - Alignment coordinates
+- `pa_comparison.[png/ps]` - Dot plot visualization generated by `mummerplot`
+
+Quick Analysis Script
+Here's a small Python script to quickly summarize SNPs/indels:
+
+```python
 #!/usr/bin/env python3
 import pandas as pd
 
-# Read SNPs
+# Read SNPs (skip header lines from show-snps)
 snps = pd.read_csv('pa_comparison.snps', sep='\t', skiprows=5, 
                    names=['P1', 'SUB', 'P2', 'BUFF', 'DIST', 'LEN_R', 'LEN_Q', 'FRM', 'TAGS'])
 
@@ -80,17 +103,21 @@ print(f"Total SNPs/indels: {len(snps)}")
 print(f"SNPs: {len(snps[snps['SUB'] != '.'])}")
 print(f"Indels: {len(snps[snps['SUB'] == '.'])}")
 
-# Read alignment stats
-with open('pa_comparison.report', 'r') as f:
-    content = f.read()
-    print("\nAlignment Summary:")
-    print(content)
-Would you like me to help you with:
+# Read dnadiff report if present
+try:
+    with open('pa_comparison.report', 'r') as f:
+        print('\nAlignment Summary:')
+        print(f.read())
+except FileNotFoundError:
+    print('pa_comparison.report not found; run dnadiff to generate a report')
+```
 
-Selecting a specific ST235 strain genome?
-Setting up any of these tools?
-Interpreting the results once you have them?
-Adding resistance gene or virulence factor analysis?
+Need help?
+- Want me to pick a different ST235 assembly accession?
+- Want a script that runs the full pipeline end-to-end and records timestamps/logs?
+- Need help interpreting the `pa_comparison.report` or the dotplot output?
+
+I can make those changes or create a runnable script for you.
 
 
 

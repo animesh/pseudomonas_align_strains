@@ -4,15 +4,12 @@
 
 ---
 
-## 🚀 Complete Workflow (2024)
-
-### 📝 Project Overview
-This guide walks you through downloading, aligning, and visualizing the genomes of two Pseudomonas aeruginosa strains using MUMmer, with special focus on identifying and highlighting the VIM gene (blaVIM-2) that is unique to ST235.
+Downloading, aligning, and visualizing the genomes of two Pseudomonas aeruginosa strains using MUMmer, with special focus on identifying and highlighting the VIM gene (blaVIM-2) that is unique to ST235.
 
 ---
 
 ### 🛠️ Prerequisites
-- Linux/WSL2 environment
+- something like Linux/WSL2 environment
 - [MUMmer](https://github.com/mummer4/mummer) (v4+ recommended)
 - [BLAST+](https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=Download) (for gene searches)
 - `awk`, `gnuplot`, `wget` (standard on most Linux systems)
@@ -25,21 +22,21 @@ sudo apt-get install mummer gnuplot ncbi-blast+
 
 ---
 
-### 📥 1. Download Genome FASTA Files
-```bash
+###  1. Download Genome FASTA Files
 # Download ATCC 27853 genome
-wget -O ATCC.fasta "https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_001687285.1/"
+ATCC.fasta "https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_001687285.1/"
 
 # Download ST235 genome  
-wget -O ST.fasta "https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_016923535.1/"
+ST.fasta "https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_016923535.1/"
 
+```bash
 # Download VIM gene (blaVIM-2) for analysis
 curl -L 'https://www.ncbi.nlm.nih.gov/nuccore/GU137304.1?report=fasta&format=text' -o blaVIM2.fasta
 ```
 
 ---
 
-### 🧩 2. Align Genomes with MUMmer
+###  2. Align Genomes with MUMmer
 ```bash
 nucmer --prefix=ATCC_vs_ST ATCC.fasta ST.fasta
 delta-filter -1 ATCC_vs_ST.delta > ATCC_vs_ST.filtered.delta
@@ -48,7 +45,7 @@ show-coords -rcl ATCC_vs_ST.filtered.delta > ATCC_vs_ST.coords
 
 ---
 
-### 🔍 3. Search for VIM Gene
+###  3. Search for VIM Gene
 ```bash
 # Create BLAST databases
 makeblastdb -in ATCC.fasta -dbtype nucl
@@ -67,7 +64,7 @@ wc -l VIM_in_ST.txt
 
 ---
 
-### 📊 4. Summarize Alignment
+###  4. Summarize Alignment
 ```bash
 awk 'NR>5 {aligned+=$7; refcov+=$11; querycov+=$12; blocks++} END {print "Total aligned bases:", aligned; print "Alignment blocks:", blocks; print "Avg % identity:", "see below"}' ATCC_vs_ST.coords
 awk 'NR>5 {id+=$8*$7; len+=$7} END {if(len>0) print "Weighted avg % identity:", id/len; else print "No alignments"}' ATCC_vs_ST.coords
@@ -75,7 +72,7 @@ awk 'NR>5 {id+=$8*$7; len+=$7} END {if(len>0) print "Weighted avg % identity:", 
 
 ---
 
-### 🖼️ 5. Generate Basic Dotplot
+###  5. Generate Basic Dotplot
 ```bash
 mummerplot --png --large --layout --filter --prefix=ATCC_vs_ST_plot ATCC_vs_ST.filtered.delta
 # Fix gnuplot error if it occurs
@@ -85,7 +82,7 @@ gnuplot ATCC_vs_ST_plot.gp
 
 ---
 
-### 🎨 6. Create Enhanced Dotplot with VIM Gene Highlight
+###  6. Create Enhanced Dotplot with VIM Gene Highlight
 ```bash
 # Add VIM gene annotation and styling to the gnuplot script
 cat >> ATCC_vs_ST_plot.gp << 'EOF'
@@ -115,7 +112,7 @@ gnuplot ATCC_vs_ST_plot.gp
 
 ---
 
-### 📈 Results Summary
+###  Results Summary
 | Metric                      | Value         |
 |-----------------------------|--------------|
 | **Total aligned bases**     | 6,123,079    |
@@ -195,4 +192,68 @@ gnuplot ATCC_vs_ST_plot.gp
 - Next steps:
   - If available, provide the exact ST235 accession from Urbanowicz et al., 2021 to replace the representative genome and re-run.
   - Compute robust ANI and SNP/indel stats (e.g., `dnadiff`/`fastANI`) and generate a brief report.
+ 
+  ### Plot sanitization (headless rendering)
+
+  Some gnuplot scripts produced by the plot generator include interactive commands (mouse/clipboard handlers, `print` banners and `pause -1`) which force gnuplot into interactive mode and prevent headless PNG generation. To run the plots on a headless machine or inside scripts, the following conservative changes were applied to problematic `.gp` files in this repo:
+
+  - Removed interactive lines:
+    - any lines beginning with `set mouse ...`
+    - `print` lines that show an interactive banner
+    - `pause -1`
+  - Ensured non-interactive output by adding (when needed):
+    - `set terminal pngcairo size 1600,1200 enhanced font "Courier,8"`
+    - `set output '/full/path/to/<name>.png'` (absolute path) before plotting commands
+
+  Files already sanitized in this repo:
+  - `pa_comparison.gp` → `pa_comparison.png`
+  - `pa_comparison.relaxed.gp` → `pa_comparison.relaxed.png`
+
+  How to re-run the sanitized plots
+  - From the project root run:
+
+  ```bash
+  cd /home/ash022/pseudomonas_align_strains
+  gnuplot pa_comparison.gp
+  gnuplot pa_comparison.relaxed.gp
+  gnuplot pa_comparison.rects.gp
+  ```
+
+  Quick check (verify output):
+
+  ```bash
+  ls -l pa_comparison*.png
+  # Expect non-zero-sized PNG files: pa_comparison.png, pa_comparison.relaxed.png, pa_comparison.rects.png
+  ```
+
+  Optional: small helper to sanitize other `.gp` files
+  - Save this as `scripts/sanitize_gp.sh`, make it executable, then run it on any `.gp` files you need to sanitize.
+
+  ```bash
+  mkdir -p scripts
+  cat > scripts/sanitize_gp.sh <<'EOF'
+  #!/usr/bin/env bash
+  set -euo pipefail
+  for f in "$@"; do
+    echo "Sanitizing: $f"
+    # remove interactive lines that break headless rendering
+    sed -i '/^set mouse/d;/^print /d;/^pause -1/d' "$f"
+
+    # ensure a pngcairo terminal is present
+    if ! grep -q '^set terminal' "$f"; then
+      sed -i '1i set terminal pngcairo size 1600,1200 enhanced font "Courier,8"' "$f"
+    fi
+
+    # ensure an absolute output line is present
+    if ! grep -q '^set output' "$f"; then
+      out="$(pwd)/${f%.gp}.png"
+      sed -i "1i set output '$out'" "$f"
+    fi
+  done
+  EOF
+  chmod +x scripts/sanitize_gp.sh
+
+  # Usage example:
+  # scripts/sanitize_gp.sh pa_comparison.gp pa_comparison.relaxed.gp other_plot.gp
+  ```
 
