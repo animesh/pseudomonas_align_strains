@@ -1,6 +1,6 @@
-# 🧬 Pseudomonas Genome Alignment Project
+# Pseudomonas Genome Alignment Project
 
-> **Compare the genomes of Pseudomonas aeruginosa ATCC 27853 and ST235 with easy, reproducible steps and a beautiful dotplot visualization highlighting the VIM gene.**
+> **Compare the genomes of Pseudomonas aeruginosa ATCC 27853 and ST235 with quick and dirty but reproducible steps and a dotplot visualization gene.**
 
 ---
 
