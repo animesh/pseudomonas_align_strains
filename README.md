@@ -1,28 +1,58 @@
 # pseudomonas_align_strains
 
-## New Genome Alignment (2024)
+## Reproducible Genome Alignment Workflow (2024)
 
-### File Sources
-- **ATCC.fasta**: [GCA_001687285.1](https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_001687285.1/)
-- **ST.fasta**: [GCA_016923535.1](https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_016923535.1/)
+This guide describes how to compare the genomes of Pseudomonas aeruginosa ATCC 27853 and ST235 using MUMmer (nucmer) and visualize the results.
 
-### Alignment Commands
+### Prerequisites
+- Linux/WSL2 environment
+- [MUMmer](https://github.com/mummer4/mummer) (tested with v4+)
+- `awk`, `gnuplot`, `wget` (standard on most Linux systems)
+
+#### Install MUMmer (if not already installed)
 ```bash
-# Align genomes using MUMmer (nucmer)
+sudo apt-get update
+sudo apt-get install mummer gnuplot
+```
+
+### 1. Download Genome FASTA Files
+```bash
+# Download ATCC 27853 genome
+wget -O ATCC.fasta "https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_001687285.1/"
+
+# Download ST235 genome
+wget -O ST.fasta "https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_016923535.1/"
+```
+(Or download manually from the NCBI links and place in your working directory.)
+
+### 2. Align Genomes with MUMmer
+```bash
 nucmer --prefix=ATCC_vs_ST ATCC.fasta ST.fasta
 delta-filter -1 ATCC_vs_ST.delta > ATCC_vs_ST.filtered.delta
 show-coords -rcl ATCC_vs_ST.filtered.delta > ATCC_vs_ST.coords
+```
 
-# Summarize alignment
+### 3. Summarize Alignment
+```bash
 awk 'NR>5 {aligned+=$7; refcov+=$11; querycov+=$12; blocks++} END {print "Total aligned bases:", aligned; print "Alignment blocks:", blocks; print "Avg % identity:", "see below"}' ATCC_vs_ST.coords
 awk 'NR>5 {id+=$8*$7; len+=$7} END {if(len>0) print "Weighted avg % identity:", id/len; else print "No alignments"}' ATCC_vs_ST.coords
 ```
 
-### Results Summary
+### 4. Visualize Alignment (Dotplot)
+```bash
+mummerplot --png --large --layout --filter --prefix=ATCC_vs_ST_plot ATCC_vs_ST.filtered.delta
+# If you get a gnuplot error, remove the problematic line and rerun:
+sed -i '/set mouse clipboardformat/d' ATCC_vs_ST_plot.gp
+gnuplot ATCC_vs_ST_plot.gp
+```
+- The plot will be saved as `ATCC_vs_ST_plot.png`.
+
+### 5. Results Summary
 - **Total aligned bases:** 6,123,079
 - **Number of alignment blocks:** 298
 - **Weighted average percent identity:** Most blocks >98% (see .coords for details)
 - The two genomes are highly similar, with large syntenic blocks and high sequence identity.
+- ![Alignment Dotplot](ATCC_vs_ST_plot.png)
 
 ---
 compare the genome of ATCC 27853 (Cao et al., 2017) with that of the ST235 strain used in this study (Urbanowicz et al., 2021)
