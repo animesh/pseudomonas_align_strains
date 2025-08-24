@@ -5,7 +5,7 @@ Step 1: Download Genome Sequences
 mkdir -p pa_comparison && cd pa_comparison
 
 # Download ATCC 27853 genome (saved as ATCC.fixed.fasta)
-wget -O ATCC.fixed.fasta "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?tool=portal&save=file&log$=seqview&db=nuccore&report=fasta&id=CP009001.1"
+wget -O ATCC.wget.fasta "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?tool=portal&save=file&log$=seqview&db=nuccore&report=fasta&id=CP011857.1"
 
 # Download a representative ST235 genome (saved as ST.fixed.fasta)
 wget -O ST.fixed.fasta "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?tool=portal&save=file&log$=seqview&db=nuccore&report=fasta&id=CP003149.1"
