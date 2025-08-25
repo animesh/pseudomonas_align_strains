@@ -228,3 +228,325 @@ gnuplot ATCC_vs_ST_plot.gp
   # scripts/sanitize_gp.sh pa_comparison.gp pa_comparison.relaxed.gp other_plot.gp
   ```
 
+## Reproducible pipeline — commands and helper scripts
+
+Below are concrete commands and the small helper scripts used during this analysis so you can reproduce the pipeline from Bakta TSVs to grouped summaries and a proportional Venn diagram.
+
+Prereqs (system packages)
+```bash
+# required system tools used in this repo
+sudo apt-get update
+sudo apt-get install -y mummer gnuplot ncbi-blast+ python3-pip
+```
+
+Prereqs (python packages)
+```bash
+# install plotting and venn library into the same python used here
+python3 -m pip install --user matplotlib matplotlib-venn
+```
+
+Assumptions
+- Input annotation TSVs are `ATCC.tsv` and `ST.tsv` (Bakta output TSVs). If you don't have them, run Bakta or Prokka first to create those files.
+
+1) Group each Bakta TSV by the raw `Product` string and add a `Matches` count
+
+Save this as `scripts/group_by_product_with_counts.py` and run it.
+
+```python
+#!/usr/bin/env python3
+from pathlib import Path
+from collections import defaultdict
+
+def group_by_product(inpath, outpath):
+    p = Path(inpath)
+    text = p.read_text(encoding='utf-8', errors='surrogateescape').splitlines()
+    header_line = None
+    for i, l in enumerate(text[:10]):
+        if l.startswith('#') and 'Sequence' in l:
+            header_line = l.lstrip('#')
+            start = i
+            break
+    if header_line is None:
+        header_line = text[0]
+        start = 0
+    fieldnames = [f.strip() for f in header_line.split('\t')]
+    rows = []
+    for l in text[start+1:]:
+        if not l.strip():
+            continue
+        parts = l.split('\t')
+        if len(parts) < len(fieldnames):
+            parts += [''] * (len(fieldnames) - len(parts))
+        row = dict(zip(fieldnames, parts))
+        rows.append(row)
+    groups = defaultdict(list)
+    for r in rows:
+        prod = r.get('Product','')
+        groups[prod].append(r)
+    out_header = ['Product','Matches'] + [c for c in fieldnames if c!='Product']
+    out_lines = []
+    for prod, items in sorted(groups.items(), key=lambda x: (-len(x[1]), x[0])):
+        matches = len(items)
+        agg = {}
+        for col in fieldnames:
+            vals = []
+            for it in items:
+                v = it.get(col,'')
+                if v and v not in vals:
+                    vals.append(v)
+            agg[col] = ';'.join(vals)
+        rowout = [prod, str(matches)] + [agg[c] for c in fieldnames if c!='Product']
+        out_lines.append('\t'.join(rowout))
+    outp = Path(outpath)
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    with outp.open('w', encoding='utf-8') as fh:
+        fh.write('\t'.join(out_header) + '\n')
+        for l in out_lines:
+            fh.write(l + '\n')
+
+if __name__ == '__main__':
+    group_by_product('ATCC.tsv','ATCC_grouped_by_product_with_counts.tsv')
+    group_by_product('ST.tsv','ST_grouped_by_product_with_counts.tsv')
+```
+
+Run:
+```bash
+python3 scripts/group_by_product_with_counts.py
+```
+
+2) Merge the two grouped files keeping per-file counts and a `Total_Matches` column
+
+Save this as `scripts/merge_grouped_with_counts.py`.
+
+```python
+#!/usr/bin/env python3
+from pathlib import Path
+
+def read_grouped(path):
+    text = Path(path).read_text(encoding='utf-8', errors='surrogateescape').splitlines()
+    header = text[0].split('\t')
+    rows = {}
+    for ln in text[1:]:
+        if not ln.strip():
+            continue
+        parts = ln.split('\t')
+        if len(parts) < len(header):
+            parts += [''] * (len(header)-len(parts))
+        d = dict(zip(header, parts))
+        prod = d.get('Product','')
+        rows[prod] = {'Matches': int(d.get('Matches','0') or 0), 'data': d}
+    return header, rows
+
+ha, ra = read_grouped('ATCC_grouped_by_product_with_counts.tsv')
+hs, rs = read_grouped('ST_grouped_by_product_with_counts.tsv')
+cols_a = [c for c in ha if c not in ('Product','Matches')]
+cols_s = [c for c in hs if c not in ('Product','Matches')]
+all_products = sorted(set(list(ra.keys()) + list(rs.keys())))
+outcols = ['Product','ATCC_Matches','ST_Matches','Total_Matches'] + [f'ATCC_{c}' for c in cols_a] + [f'ST_{c}' for c in cols_s]
+with open('combined_grouped_with_counts.tsv','w',encoding='utf-8') as fh:
+    fh.write('\t'.join(outcols) + '\n')
+    for prod in all_products:
+        a = ra.get(prod)
+        s = rs.get(prod)
+        a_matches = a['Matches'] if a else 0
+        s_matches = s['Matches'] if s else 0
+        total = a_matches + s_matches
+        row = [prod, str(a_matches), str(s_matches), str(total)]
+        for c in cols_a:
+            row.append(a['data'].get(c,'') if a else '')
+        for c in cols_s:
+            row.append(s['data'].get(c,'') if s else '')
+        fh.write('\t'.join(row) + '\n')
+```
+
+Run:
+```bash
+python3 scripts/merge_grouped_with_counts.py
+```
+
+3) Mark source (ATCC_only / ST_only / both)
+
+Save as `scripts/mark_sources.py`:
+
+```python
+#!/usr/bin/env python3
+from pathlib import Path
+lines = Path('combined_grouped_with_counts.tsv').read_text(encoding='utf-8', errors='surrogateescape').splitlines()
+header = lines[0].split('\t')
+with open('combined_grouped_with_counts_marked.tsv','w',encoding='utf-8') as fh:
+    fh.write('\t'.join(header + ['Source']) + '\n')
+    for ln in lines[1:]:
+        if not ln.strip():
+            continue
+        parts = ln.split('\t')
+        row = dict(zip(header, parts))
+        a = int(row.get('ATCC_Matches','0') or 0)
+        s = int(row.get('ST_Matches','0') or 0)
+        if a>0 and s>0:
+            src='both'
+        elif a>0:
+            src='ATCC_only'
+        elif s>0:
+            src='ST_only'
+        else:
+            src='none'
+        fh.write('\t'.join(parts + [src]) + '\n')
+```
+
+Run:
+```bash
+python3 scripts/mark_sources.py
+```
+
+4) Proportional two-set Venn (matplotlib-venn)
+
+Save as `scripts/venn_proportional.py`:
+
+```python
+#!/usr/bin/env python3
+from pathlib import Path
+from matplotlib_venn import venn2
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+lines = Path('combined_grouped_with_counts_marked.tsv').read_text(encoding='utf-8', errors='surrogateescape').splitlines()
+header = lines[0].split('\t')
+src_idx = header.index('Source')
+counts = {'ATCC_only':0,'ST_only':0,'both':0}
+for ln in lines[1:]:
+    if not ln.strip():
+        continue
+    parts = ln.split('\t')
+    src = parts[src_idx]
+    if src in counts:
+        counts[src]+=1
+set1 = counts['ATCC_only'] + counts['both']
+set2 = counts['ST_only'] + counts['both']
+inter = counts['both']
+plt.figure(figsize=(6,6))
+venn = venn2(subsets=(set1-inter, set2-inter, inter), set_labels=('ATCC','ST'))
+if venn.get_label_by_id('10'):
+    venn.get_label_by_id('10').set_text(str(counts['ATCC_only']))
+if venn.get_label_by_id('01'):
+    venn.get_label_by_id('01').set_text(str(counts['ST_only']))
+if venn.get_label_by_id('11'):
+    venn.get_label_by_id('11').set_text(str(counts['both']))
+plt.title('Product overlap: ATCC vs ST')
+plt.savefig('venn_proportional_ATCC_ST.png', dpi=200, bbox_inches='tight')
+```
+
+Run:
+```bash
+python3 scripts/venn_proportional.py
+```
+
+Files created by the reproducible pipeline (names used above)
+- `ATCC_grouped_by_product_with_counts.tsv`
+- `ST_grouped_by_product_with_counts.tsv`
+- `combined_grouped_with_counts.tsv`
+- `combined_grouped_with_counts_marked.tsv`
+- `venn_proportional_ATCC_ST.png` (proportional Venn diagram)
+
+If you want, I can add and commit these helper scripts into the repository under `scripts/` now. Reply "yes, commit scripts" to have me create the `scripts/` folder and add these files to git.
+
+## Bakta installation & annotation (how I ran it)
+
+The genome annotation step in this project used Bakta. Below are the concrete commands I used so you can reproduce the annotation locally.
+
+Prereqs (recommended)
+```bash
+# optional: create an isolated conda env (recommended)
+conda create -n bakta python=3.10 -y
+conda activate bakta
+
+# or use your system Python/pip
+python3 -m pip install --user pipx || true
+```
+
+Install Bakta
+```bash
+# using pip inside the active environment
+python3 -m pip install --upgrade pip
+python3 -m pip install bakta
+
+# confirm version
+bakta --version
+# expected output (example): bakta 1.11.3
+```
+
+Obtain a Bakta DB bundle
+
+- I used a lightweight DB bundle (named `db-light.tar.xz` in my run). If you have a supplied archive use it; otherwise download the appropriate Bakta DB from the Bakta release or provider.
+
+```bash
+# create a folder for the DB and extract the bundle
+mkdir -p bakta_db
+# path/to/db-light.tar.xz may be a local path or downloaded file
+tar -xJf /path/to/db-light.tar.xz -C bakta_db
+```
+
+Run Bakta annotation (examples used in this repository)
+```bash
+# annotate ATCC
+bakta annotate \
+  --db-dir bakta_db \
+  --output bakta_ATCC \
+  --prefix ATCC \
+  ATCC.fasta
+
+# annotate ST
+bakta annotate \
+  --db-dir bakta_db \
+  --output bakta_ST \
+  --prefix ST \
+  ST.fasta
+```
+
+Outputs
+- Annotation directories: `bakta_ATCC/`, `bakta_ST/`
+- Main TSVs used downstream: `ATCC.tsv` and `ST.tsv` (extracted from the Bakta outputs)
+
+Troubleshooting notes
+- If Bakta (or one of its bundled AMR binaries) fails with C++ runtime errors (missing GLIBCXX symbols), use a Conda environment with a current toolchain or update the environment's `libstdc++`/`gcc` packages. For example:
+```bash
+conda install -n bakta libgcc-ng libstdcxx-ng -y
+```
+- If you have a custom DB bundle, pass its directory with `--db-dir` as shown above.
+
+If you want, I can add the exact `bakta` command-lines that were run (including any extra flags) into the repository's run-log; tell me if you'd like them appended.
+
+### Exact commands I ran for Bakta in this project
+
+The following are the exact shell commands used during this session to set up Bakta, install the DB bundle provided to me, fix the AMR runtime libraries, run annotation, and copy the produced TSVs into the repository root.
+
+```bash
+# create & enter conda env (optional but recommended)
+conda create -n bakta python=3.10 -y
+conda activate bakta
+
+# install bakta
+python3 -m pip install --upgrade pip
+python3 -m pip install bakta
+
+# extract the user-supplied Bakta DB bundle used in this run
+mkdir -p bakta_db
+# (path used in this session)
+# replace the path below with your DB archive path if different
+tar -xJf /mnt/z/Download/db-light.tar.xz -C bakta_db
+
+# fix runtime libs for bundled AMR binary (if you see GLIBCXX errors)
+conda install -n bakta libgcc-ng libstdcxx-ng -y
+
+# Run Bakta annotation (commands used here)
+bakta annotate --db-dir bakta_db --output bakta_ATCC --prefix ATCC ATCC.fasta
+bakta annotate --db-dir bakta_db --output bakta_ST --prefix ST ST.fasta
+
+# Copy or move main TSV outputs into repo root for downstream scripts
+# (Bakta writes TSVs into its output directory; copy them here)
+cp bakta_ATCC/ATCC.tsv ./ATCC.tsv
+cp bakta_ST/ST.tsv ./ST.tsv
+```
+
+These exact commands should reproduce the annotation step performed for `ATCC.fasta` and `ST.fasta` in this project. If your DB archive or paths differ, update the `tar -xJf` command and `--db-dir` accordingly.
+
