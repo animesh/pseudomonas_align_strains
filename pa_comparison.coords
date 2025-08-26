@@ -1,4 +1,4 @@
-/home/ash022/pseudomonas_align_strains/ATCC.fasta /home/ash022/pseudomonas_align_strains/ST.fasta
+/home/ash022/pseudomonas_align_strains/ATCC.fixed.fasta /home/ash022/pseudomonas_align_strains/ST.fixed.fasta
 NUCMER
 
     [S1]     [E1]  |     [S2]     [E2]  |  [LEN 1]  [LEN 2]  |  [% IDY]  |  [LEN R]  [LEN Q]  |  [COV R]  [COV Q]  | [TAGS]

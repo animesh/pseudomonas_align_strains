@@ -685,6 +685,49 @@ diff -u baktaATCC_grouped_by_product_with_counts.tsv bakta_localATCC_grouped_by_
 
 Comparing online vs local Bakta runs is useful to detect differences in DB versions, annotation policies, or minor version-dependent behavior in AMR/feature detection.
 
+## Genome alignment with NUCmer and visualization
+
+The repository contains an example whole-genome alignment workflow using MUMmer's `nucmer` plus downstream utilities (`delta-filter`, `show-coords`, `show-snps`) and `dnadiff` for a summary. The generated `pa_comparison.*` files in the project are the artifacts produced by that run. The minimal command sequence to reproduce the alignment and produce dotplots is shown below (run from the project root):
+
+```bash
+# Run nucmer (ATCC as reference, ST as query)
+nucmer --prefix=pa_comparison ATCC.fixed.fasta ST.fixed.fasta
+
+# Optional: filter delta to 1-to-1 best matches
+delta-filter -1 pa_comparison.delta > pa_comparison.filtered.delta || true
+
+# Generate alignment coordinates
+show-coords -rcl pa_comparison.filtered.delta > pa_comparison.coords
+
+# SNP/indel summary
+show-snps -Clr pa_comparison.filtered.delta > pa_comparison.snps
+
+# Whole-genome summary using dnadiff (optional)
+dnadiff -p pa_comparison ATCC.fixed.fasta ST.fixed.fasta
+```
+
+Visualization (dotplot using `mummerplot` and `gnuplot`):
+
+```bash
+# Prefer the filtered delta file when available; fall back to the unfiltered delta.
+if [ -s pa_comparison.filtered.delta ]; then
+    mummerplot --fat --layout --filter -p pa_comparison pa_comparison.filtered.delta || mummerplot --fat --layout -p pa_comparison pa_comparison.filtered.delta
+elif [ -s pa_comparison.delta ]; then
+    mummerplot --fat --layout -p pa_comparison pa_comparison.delta || true
+else
+    echo "No delta file found: pa_comparison.filtered.delta or pa_comparison.delta" >&2
+fi
+
+# Run the generated gnuplot script in headless mode (the repo contains sanitized .gp scripts)
+gnuplot pa_comparison.gp
+```
+
+Notes:
+- The repo already contains sanitized and exported dotplot files (`pa_comparison.png`, `pa_comparison.svg`, `pa_comparison.pdf`, `pa_comparison.rects.*` etc.).
+- If `mummerplot` or the MUMmer tools are not on your PATH, install MUMmer (the version used here included `nucmer`, `delta-filter`, `show-coords`, `show-snps`, `mummerplot`, and `dnadiff`).
+
+I will commit the `pa_comparison.*` artifacts that exist in the repository so the outputs are tracked. If you prefer a smaller set (for example only `pa_comparison.coords`, `pa_comparison.png`, `pa_comparison.pdf`, and `pa_comparison.snps`) tell me and I'll commit only those.
+
 ## Results — comparison artifacts
 
 The repository now contains a small set of comparison artifacts created from two snapshots of
