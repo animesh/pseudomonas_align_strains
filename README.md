@@ -685,3 +685,34 @@ diff -u baktaATCC_grouped_by_product_with_counts.tsv bakta_localATCC_grouped_by_
 
 Comparing online vs local Bakta runs is useful to detect differences in DB versions, annotation policies, or minor version-dependent behavior in AMR/feature detection.
 
+## Results — comparison artifacts
+
+The repository now contains a small set of comparison artifacts created from two snapshots of
+`combined_grouped_with_counts_marked.tsv` (the original and the latest committed versions). These files
+are stored under `results/` for provenance and easy inspection:
+
+- `results/orig_snapshot.tsv` — the original `combined_grouped_with_counts_marked.tsv` (first committed version).
+- `results/latest_snapshot.tsv` — the latest `combined_grouped_with_counts_marked.tsv` (HEAD at the time of comparison).
+- `results/added_products.csv` — products present in the latest snapshot but not in the original; includes
+  columns: Product, ATCC_Matches, ST_Matches, Total_Matches, Source.
+- `results/removed_products.csv` — products present in the original snapshot but not in the latest; same columns.
+
+These CSVs were generated to make it easy to review annotation changes (newly-added products and products
+that were removed between the two snapshots). If you want to reproduce the comparison locally, one simple
+way is to extract the two snapshots from Git and re-run the text-based diff pipeline. For example:
+
+```bash
+# extract two committed versions of the file (replace <old-commit> and <new-commit> with the desired refs)
+# then run a minimal set-difference on the Product column
+git show <old-commit>:combined_grouped_with_counts_marked.tsv > /tmp/orig_snapshot.tsv
+git show <new-commit>:combined_grouped_with_counts_marked.tsv > /tmp/latest_snapshot.tsv
+cut -f1 /tmp/orig_snapshot.tsv | tail -n +2 | sort > /tmp/orig_products.txt
+cut -f1 /tmp/latest_snapshot.tsv | tail -n +2 | sort > /tmp/latest_products.txt
+comm -23 /tmp/latest_products.txt /tmp/orig_products.txt > /tmp/added_products.txt
+comm -13 /tmp/latest_products.txt /tmp/orig_products.txt > /tmp/removed_products.txt
+```
+
+If you'd like, I can also add the exact commands and commit hashes used to produce the `results/` files in this
+project (and commit them) so the extraction above is completely reproducible; tell me if you want me to add
+that detail to this section.
+
