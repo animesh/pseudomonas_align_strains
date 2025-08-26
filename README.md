@@ -613,3 +613,75 @@ cp bakta_ST/ST.tsv ./ST.tsv
 
 These exact commands should reproduce the annotation step performed for `ATCC.fasta` and `ST.fasta` in this project. If your DB archive or paths differ, update the `tar -xJf` command and `--db-dir` accordingly.
 
+
+## Imported Bakta TSVs, grouping and Venn diagram
+
+I copied Bakta TSV exports (`baktaATCC.tsv`, `baktaST.tsv`) into the repository root and produced grouped summaries and a proportional Venn diagram for ATCC vs ST products.
+
+Files created in this step (present in the repo):
+
+- `baktaATCC.tsv` — Bakta TSV for ATCC
+- `baktaST.tsv` — Combined Bakta TSV(s) for ST
+- `baktaATCC_grouped_by_product_with_counts.tsv`
+- `baktaST_grouped_by_product_with_counts.tsv`
+- `combined_grouped_with_counts.tsv`
+- `combined_grouped_with_counts_marked.tsv` (has `Source` column: ATCC_only/ST_only/both)
+- `venn_proportional_ATCC_ST.png`
+
+Reproduce these steps locally (from project root):
+
+```bash
+# Ensure you have the Bakta TSV exports in the repo root as `baktaATCC.tsv` and `baktaST.tsv`.
+
+# Group by product (the helper groups by the raw Product string):
+python3 - <<'PY'
+from scripts.group_by_product_with_counts import group_by_product
+group_by_product('baktaATCC.tsv','baktaATCC_grouped_by_product_with_counts.tsv')
+group_by_product('baktaST.tsv','baktaST_grouped_by_product_with_counts.tsv')
+PY
+
+# Copy grouped files to the canonical names expected by the merge script and merge:
+cp baktaATCC_grouped_by_product_with_counts.tsv ATCC_grouped_by_product_with_counts.tsv
+cp baktaST_grouped_by_product_with_counts.tsv ST_grouped_by_product_with_counts.tsv
+python3 scripts/merge_grouped_with_counts.py
+
+# Mark sources (adds 'Source' column)
+python3 scripts/mark_sources.py
+
+# Create proportional Venn diagram (requires matplotlib-venn)
+python3 scripts/venn_proportional.py
+```
+
+Notes:
+
+- Install `matplotlib-venn` if missing: `python3 -m pip install --user matplotlib-venn`.
+- These helper scripts are lightweight; you may want to run normalization (lowercase, synonym mapping) on `Product` before grouping for cleaner results.
+
+
+NOTE: these `bakta*.tsv` files were produced by the online Proksee/Bakta service (exported from Proksee projects):
+
+- ST combined from Proksee projects:
+    - https://proksee.ca/projects/60766a46-90fd-43ae-acce-c5f56372087a
+    - https://proksee.ca/projects/cdf82d4c-7de5-4e96-afae-9812033db694
+- ATCC from Proksee project:
+    - https://proksee.ca/projects/f60d33bc-d8d6-478e-a2a9-93251a45dc59
+
+If you'd like to compare these online-generated Bakta TSVs with local Bakta results, run Bakta locally and recreate the TSVs (see the "Bakta installation & annotation" section above), then re-run the grouping/merge/venn steps and diff the outputs. Example quick comparison commands:
+
+```bash
+# run local Bakta (example)
+bakta annotate --db-dir bakta_db --output bakta_local_ATCC --prefix ATCC ATCC.fasta
+cp bakta_local_ATCC/ATCC.tsv ./bakta_local_ATCC.tsv
+
+# produce grouped file locally
+python3 - <<'PY'
+from scripts.group_by_product_with_counts import group_by_product
+group_by_product('bakta_local_ATCC.tsv','bakta_localATCC_grouped_by_product_with_counts.tsv')
+PY
+
+# quick diff against the Proksee-exported grouped file
+diff -u baktaATCC_grouped_by_product_with_counts.tsv bakta_localATCC_grouped_by_product_with_counts.tsv | sed -n '1,200p'
+```
+
+Comparing online vs local Bakta runs is useful to detect differences in DB versions, annotation policies, or minor version-dependent behavior in AMR/feature detection.
+
