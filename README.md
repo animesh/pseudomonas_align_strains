@@ -119,6 +119,18 @@ gnuplot ATCC_vs_ST_plot.gp
 
 **Plot Legend:**
 
+### Plot legend (colors, meaning and counts)
+
+- FWD (cyan): forward alignments; here 169 blocks covering 3,470,819 bp of the reference.
+- REV (purple): reverse/inverted alignments; here 129 blocks covering 2,652,260 bp of the reference.
+- OTH (black): other/auxiliary alignments or overlays (used as a placeholder in the script); 0 blocks in this run.
+
+Notes:
+- The plot line-styles have been explicitly set in `pa_comparison.gp` so plotted colors match the legend (ls 1 = cyan, ls 2 = purple, ls 3 = black).
+- "OTH" is a generic label for any additional alignment type or overlay plotted with the third line style; it is present as a placeholder so the legend can be extended without reformatting the plot.
+- The visual prominence of purple dots on the dotplot can be affected by placement (reverse matches are often scattered and visually distinct), overplotting, and color contrast — the numeric counts above show forward alignments still cover more bases in this comparison.
+
+
 
 ## 📚 References & Further Info
 

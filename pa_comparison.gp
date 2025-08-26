@@ -1810,17 +1810,18 @@ set ylabel "QRY"
 set format "%.0f"
 set xrange [1:6833187]
 set yrange [1:7550891]
-set style line 1  lt 1 lw 2 pt 6 ps 1
-set style line 2  lt 3 lw 2 pt 6 ps 1
-set style line 3  lt 2 lw 2 pt 6 ps 1
+set style line 1 lc rgb "cyan"  lt 1 lw 2 pt 6 ps 1
+set style line 2 lc rgb "purple" lt 3 lw 2 pt 6 ps 1
+set style line 3 lc rgb "black"  lt 2 lw 2 pt 6 ps 1
 
 # --- Legend (compact, bottom-left) ----------------------------------
 # Show only the primary color mapping (FWD/REV) and place it near the
 # bottom-left so it doesn't overlap annotations. Use small font.
  # place legend at bottom-right: start at x=0.70 so it sits near right edge
-set object 201 rect at graph 0.70, graph 0.02 size graph 0.28, graph 0.06 fc rgb "white" fillstyle solid noborder
-set label 101 "FWD: forward alignments" at graph 0.73, graph 0.055 left font "Courier,10" tc rgb "cyan"
-set label 102 "REV: reverse alignments" at graph 0.73, graph 0.03 left font "Courier,10" tc rgb "purple"
+set object 201 rect at graph 0.70, graph 0.02 size graph 0.28, graph 0.09 fc rgb "white" fillstyle solid noborder
+set label 101 "FWD: forward alignments (169 blocks, 3,470,819 bp)" at graph 0.73, graph 0.08 left font "Courier,10" tc rgb "cyan"
+set label 102 "REV: reverse alignments (129 blocks, 2,652,260 bp)" at graph 0.73, graph 0.05 left font "Courier,10" tc rgb "purple"
+set label 103 "OTH: other/auxiliary alignments (e.g. additional overlays; 0 blocks here)" at graph 0.73, graph 0.02 left font "Courier,10" tc rgb "black"
 # ---------------------------------------------------------------------
 plot \
  "pa_comparison.fplot" title "FWD" w lp ls 1, \
