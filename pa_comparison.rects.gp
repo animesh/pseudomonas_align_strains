@@ -55,16 +55,16 @@ plot \
 # end
 
 # Precise ATCC x ST rectangles computed from pa_comparison.coords and bla_ST.coords
-# rect 1: ST JAFFXY010000040.1 458264-458906 -> ATCC 1-1
-set object 101 rect from 1,458264 to 1,458906 fc rgb "green" fillstyle solid 0.25 noborder
-# rect 2: ST JAFFXY010000040.1 458898-459753 -> ATCC 1-1
-set object 102 rect from 1,458898 to 1,459753 fc rgb "green" fillstyle solid 0.25 noborder
-# rect 3: ST JAFFXY010001665.1 342093-342374 -> ATCC 1-1
-set object 103 rect from 1,342093 to 1,342374 fc rgb "green" fillstyle solid 0.25 noborder
-# rect 4: ST JAFFXY010001793.1 566688-566787 -> ATCC 1-1
-set object 104 rect from 1,566688 to 1,566787 fc rgb "green" fillstyle solid 0.25 noborder
+# rect 1: ST JAFFXY010000040.1 458264-458906 -> ATCC 1-6833187
+set object 101 rect from 1,458264 to 6833187,458906 fc rgb "green" fillstyle solid 0.25 noborder
+# rect 2: ST JAFFXY010000040.1 458898-459753 -> ATCC 1-6833187
+set object 102 rect from 1,458898 to 6833187,459753 fc rgb "green" fillstyle solid 0.25 noborder
+# rect 3: ST JAFFXY010001665.1 342093-342374 -> ATCC 1-6833187
+set object 103 rect from 1,342093 to 6833187,342374 fc rgb "green" fillstyle solid 0.25 noborder
+# rect 4: ST JAFFXY010001793.1 566688-566787 -> ATCC 1-6833187
+set object 104 rect from 1,566688 to 6833187,566787 fc rgb "green" fillstyle solid 0.25 noborder
 
 # Plot the existing forward/reverse mummerplot data
 plot \
- 'pa_comparison.fplot' title 'FWD' with lp ls 1, \
- 'pa_comparison.rplot' title 'REV' with lp ls 2
++ '/home/ash022/pseudomonas_align_strains/pa_comparison.fplot' title 'FWD' with lp ls 1, \
++ '/home/ash022/pseudomonas_align_strains/pa_comparison.rplot' title 'REV' with lp ls 2
