@@ -1,4 +1,6 @@
-set terminal x11 font "Courier,8"
+# Auto-inserted header: non-interactive terminal + output for headless environments
+set terminal pngcairo size 1600,1200 enhanced font "Courier,12"
+set output 'pa_comparison.png'
 set ytics ( \
  "JAFFXY010000062.1" 1, \
  "JAFFXY010000059.1" 1236, \
