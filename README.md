@@ -114,7 +114,7 @@ gnuplot ATCC_vs_ST_plot.gp
 
 #### 🖼️ Enhanced Alignment Dotplot
 <p align="center">
-  <img src="ATCC_vs_ST_plot.png" alt="Alignment Dotplot with VIM Gene Highlight" width="600"/>
+  <img src="pa_comparison.png" alt="Alignment Dotplot" width="600"/>
 </p>
 
 **Plot Legend:**

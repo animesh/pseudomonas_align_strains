@@ -1813,6 +1813,15 @@ set yrange [1:7550891]
 set style line 1  lt 1 lw 2 pt 6 ps 1
 set style line 2  lt 3 lw 2 pt 6 ps 1
 set style line 3  lt 2 lw 2 pt 6 ps 1
+
+# --- Legend (compact, bottom-left) ----------------------------------
+# Show only the primary color mapping (FWD/REV) and place it near the
+# bottom-left so it doesn't overlap annotations. Use small font.
+ # place legend at bottom-right: start at x=0.70 so it sits near right edge
+set object 201 rect at graph 0.70, graph 0.02 size graph 0.28, graph 0.06 fc rgb "white" fillstyle solid noborder
+set label 101 "FWD: forward alignments" at graph 0.73, graph 0.055 left font "Courier,10" tc rgb "cyan"
+set label 102 "REV: reverse alignments" at graph 0.73, graph 0.03 left font "Courier,10" tc rgb "purple"
+# ---------------------------------------------------------------------
 plot \
  "pa_comparison.fplot" title "FWD" w lp ls 1, \
  "pa_comparison.rplot" title "REV" w lp ls 2
