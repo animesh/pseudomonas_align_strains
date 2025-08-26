@@ -12,12 +12,13 @@ Run from repository root: python3 scripts/make_rects.py
 """
 import math
 from pathlib import Path
+import argparse
+import logging
+import subprocess
 
-ROOT = Path('/home/ash022/pseudomonas_align_strains')
-PA_COORDS = ROOT / 'pa_comparison.coords'
-BLA_ST = ROOT / 'bla_ST.coords'
-GP_OUT = ROOT / 'pa_comparison.rects.gp'
-PNG_OUT = ROOT / 'pa_comparison.rects.png'
+# Default repo root (two levels up from this script: repo_root/scripts/..)
+ROOT = Path(__file__).resolve().parents[1]
+
 
 
 def parse_coords(fn, reverse_tags=False):
@@ -224,10 +225,28 @@ def map_overlap_global(pa_seg, bla_match, unqry):
 
 
 def main(pa_coords_path=None):
-    pa_path = Path(pa_coords_path) if pa_coords_path else PA_COORDS
-    pa_segs = parse_coords(pa_path, reverse_tags=False)
-    bla_matches = parse_bla_st(BLA_ST)
-    unqry_path = ROOT / 'pa_comparison.unqry'
+    parser = argparse.ArgumentParser(description='Compute rects for bla matches and emit a gnuplot script')
+    parser.add_argument('--pa-coords', dest='pa_coords', default=str(ROOT / 'pa_comparison.coords'), help='path to pa_comparison.coords')
+    parser.add_argument('--bla-st', dest='bla_st', default=str(ROOT / 'bla_ST.coords'), help='path to bla_ST.coords')
+    parser.add_argument('--unqry', dest='unqry', default=str(ROOT / 'pa_comparison.unqry'), help='path to pa_comparison.unqry')
+    parser.add_argument('--out-gp', dest='out_gp', default=str(ROOT / 'pa_comparison.rects.gp'), help='output gnuplot script path')
+    parser.add_argument('--out-png', dest='out_png', default=str(ROOT / 'pa_comparison.rects.png'), help='output PNG path referenced in gnuplot script')
+    parser.add_argument('--reverse-tags', dest='reverse_tags', action='store_true', help='treat tags as reversed in pa coords')
+    parser.add_argument('--export-svg', dest='export_svg', action='store_true', help='also emit SVG via gnuplot')
+    parser.add_argument('--export-pdf', dest='export_pdf', action='store_true', help='also emit PDF via gnuplot')
+    args = parser.parse_args(pa_coords_path.split() if isinstance(pa_coords_path, str) and pa_coords_path else None)
+
+    pa_path = Path(args.pa_coords)
+    bla_path = Path(args.bla_st)
+    gp_out = Path(args.out_gp)
+    png_out = Path(args.out_png)
+    unqry_path = Path(args.unqry)
+
+    logging.basicConfig(level=logging.INFO)
+    log = logging.getLogger('make_rects')
+
+    pa_segs = parse_coords(pa_path, reverse_tags=args.reverse_tags)
+    bla_matches = parse_bla_st(bla_path)
     unqry = parse_unqry(unqry_path) if unqry_path.exists() else {}
 
     rects = []
@@ -275,7 +294,7 @@ def main(pa_coords_path=None):
             for line in f:
                 # replace output and png filename
                 if line.strip().startswith('set output'):
-                    header.append(f"set output '{PNG_OUT}'\n")
+                    header.append(f"set output '{png_out}'\n")
                 elif line.strip().startswith('set terminal'):
                     header.append(line)
                 else:
@@ -285,12 +304,13 @@ def main(pa_coords_path=None):
         # minimal header
         header = [
             'set terminal pngcairo size 1600,1200 enhanced font "Courier,10"\n',
-            f"set output '{PNG_OUT}'\n",
+            f"set output '{png_out}'\n",
             'set size 1,1\nset grid\nunset key\nset border 10\nset tics scale 0\nset xlabel "CP011857.1"\nset ylabel "QRY (ST coordinates)"\nset format "%.0f"\nset xrange [1:6833187]\nset yrange [1:7550891]\n',
         ]
 
     # start writing gp
-    with open(GP_OUT, 'w') as out:
+    gp_out.parent.mkdir(parents=True, exist_ok=True)
+    with open(gp_out, 'w') as out:
         out.writelines(header)
         out.write('\n# Precise ATCC x ST rectangles computed from pa_comparison.coords and bla_ST.coords\n')
         for i, r in enumerate(rects, start=1):
@@ -301,12 +321,62 @@ def main(pa_coords_path=None):
             out.write(f"# rect {i}: ST {r['st_tag']} {st_lo_i}-{st_hi_i} -> ATCC {at_lo_i}-{at_hi_i}\n")
             out.write(f"set object {100+i} rect from {at_lo_i},{st_lo_i} to {at_hi_i},{st_hi_i} fc rgb \"green\" fillstyle solid 0.25 noborder\n")
         out.write('\n# Plot the existing forward/reverse mummerplot data\n')
-        out.write("plot \\\n 'pa_comparison.fplot' title 'FWD' with lp ls 1, \\\n 'pa_comparison.rplot' title 'REV' with lp ls 2\n")
+        out.write(f"plot \\\n+ '{ROOT / 'pa_comparison.fplot'}' title 'FWD' with lp ls 1, \\\n+ '{ROOT / 'pa_comparison.rplot'}' title 'REV' with lp ls 2\n")
+    print(f"Wrote {gp_out} with {len(rects)} rectangle(s). Output PNG will be {png_out}")
 
-    print(f"Wrote {GP_OUT} with {len(rects)} rectangle(s). Output PNG will be {PNG_OUT}")
+    # optional vector exports
+    def write_vector_gp(src_gp: Path, dest_gp: Path, terminal_line: str, out_path: Path):
+        """Create a copy of src_gp replacing terminal and output lines to produce vector output.
+
+        If the original gp lacks set terminal/set output lines, the function will prepend them.
+        """
+        with open(src_gp, 'r') as f:
+            lines = f.readlines()
+
+        had_terminal = False
+        had_output = False
+        new_lines = []
+        for line in lines:
+            if line.strip().startswith('set terminal') and not had_terminal:
+                new_lines.append(terminal_line + '\n')
+                had_terminal = True
+                continue
+            if line.strip().startswith('set output') and not had_output:
+                new_lines.append(f"set output '{out_path}'\n")
+                had_output = True
+                continue
+            new_lines.append(line)
+
+        if not had_terminal:
+            new_lines.insert(0, terminal_line + '\n')
+        if not had_output:
+            new_lines.insert(1 if had_terminal else 1, f"set output '{out_path}'\n")
+
+        dest_gp.parent.mkdir(parents=True, exist_ok=True)
+        with open(dest_gp, 'w') as f:
+            f.writelines(new_lines)
+
+    if args.export_svg:
+        svg_out = gp_out.with_suffix('.svg')
+        svg_gp = gp_out.with_suffix('.svg.gp')
+        svg_term = 'set terminal svg size 1600,1200 enhanced font "Courier,10"'
+        write_vector_gp(gp_out, svg_gp, svg_term, svg_out)
+        print(f"Wrote SVG gnuplot script {svg_gp} -> will render to {svg_out}")
+        rc = subprocess.call(['gnuplot', str(svg_gp)])
+        print('gnuplot svg rc=', rc)
+
+    if args.export_pdf:
+        pdf_out = gp_out.with_suffix('.pdf')
+        pdf_gp = gp_out.with_suffix('.pdf.gp')
+        pdf_term = 'set terminal pdfcairo enhanced font "Courier,10"'
+        write_vector_gp(gp_out, pdf_gp, pdf_term, pdf_out)
+        print(f"Wrote PDF gnuplot script {pdf_gp} -> will render to {pdf_out}")
+        rc = subprocess.call(['gnuplot', str(pdf_gp)])
+        print('gnuplot pdf rc=', rc)
 
 
 if __name__ == '__main__':
     import sys
+    # allow passing the raw argument string for compatibility with previous usage
     arg = sys.argv[1] if len(sys.argv) > 1 else None
     main(arg)

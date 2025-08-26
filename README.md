@@ -197,6 +197,35 @@ gnuplot ATCC_vs_ST_plot.gp
   # Expect non-zero-sized PNG files: pa_comparison.png, pa_comparison.relaxed.png, pa_comparison.rects.png
   ```
 
+## Run the rect generator (Makefile & wrapper)
+
+There are convenient, safe ways to generate the rectangle overlays and vector exports without accidentally overwriting a hand-edited `pa_comparison.rects.gp`.
+
+From the project root you can run the Makefile targets:
+
+```bash
+# Safe (writes auto-named files, won't overwrite a manual pa_comparison.rects.gp):
+make rects
+
+# Force overwrite canonical files (only use if you want to replace a hand-edited pa_comparison.rects.gp):
+make rects-force
+```
+
+Or use the wrapper script which also writes auto-named outputs:
+
+```bash
+scripts/run_make_rects.sh
+```
+
+If you prefer to run the script directly and control filenames/flags, here's the full CLI example that produces PNG, SVG and PDF:
+
+```bash
+python3 scripts/make_rects.py --out-gp pa_comparison.rects.gp \
+    --out-png pa_comparison.rects.png --export-svg --export-pdf
+```
+
+Note: the default (safe) targets create `pa_comparison.rects.auto.gp` / `.auto.png` / `.auto.svg` / `.auto.pdf` so you can inspect the generated plots before overwriting any canonical files.
+
   Optional: small helper to sanitize other `.gp` files
   - Save this as `scripts/sanitize_gp.sh`, make it executable, then run it on any `.gp` files you need to sanitize.
 
